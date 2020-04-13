@@ -7,9 +7,10 @@ public class GeckoController : MonoBehaviour
     [SerializeField] Transform target;
     [SerializeField] Transform headBone;
     [SerializeField] Transform tail;
-    [SerializeField] Transform yRotationTransform;
     [SerializeField] float headMaxTurnAngle = 65.0f;
     [SerializeField] float headTrackingSpeed = 1.0f;
+
+    // Parameters for eye rotation
     [SerializeField] Transform leftEyeBone;
     [SerializeField] Transform rightEyeBone;
     [SerializeField] float eyeTrackingSpeed = 10.0f;
@@ -17,10 +18,11 @@ public class GeckoController : MonoBehaviour
     [SerializeField] float leftEyeMinYRotation = 0;
     [SerializeField] float rightEyeMaxYRotation = 30.0f;
     [SerializeField] float rightEyeMinYRotation = 0;
+    
+    // The LegStepper objects for each foot
     [SerializeField] LegStepper frontLeftLegStepper;
     [SerializeField] LegStepper frontRightLegStepper;
     [SerializeField] LegStepper backLeftLegStepper;
-
     [SerializeField] LegStepper backRightLegStepper;
 
     // How fast we can turn and move full throttle
@@ -37,20 +39,26 @@ public class GeckoController : MonoBehaviour
 
     // If we are above this angle from the target, start turning
     [SerializeField] float maxAngToTarget = 5.0f;
+
+    // Whether or not the gecko adjusts to the floor below it
     [SerializeField] bool checkFloor;
+
+    // Speed at which the gecko body adjusts to meet the normal of the ground
     [SerializeField] float smoothingSpeed = 20.0f;
+
+    // An additional transform to ensure rotation around the Y-axis is consistent with
+    // the rotation of the body
+    [SerializeField] Transform yRotationTransform;
+
 
     // World space velocity
     Vector3 currentVelocity;
 
     // We are only doing a rotation around the up axis, so we only use a float here
     float currentAngularVelocity;
-    LegStepper[] feet;
-    Vector3 defaultFL = new Vector3(-0.5f, -0.3f, 0);
-    Vector3 defaultFR = new Vector3(0.5f, -0.3f, 0);
-    Vector3 defaultBL = new Vector3(-0.5f, -0.3f, -1.5f);
-    Vector3 defaultBR = new Vector3(0.5f, -0.3f, -1.5f);
 
+    // Storage for all of the LegSteppers that are used in height/rotation calculations
+    LegStepper[] feet;
 
     void Awake()
     {
@@ -66,7 +74,7 @@ public class GeckoController : MonoBehaviour
         EyeTrackingUpdate();
         if (checkFloor)
         {
-            FootHeightUpdate();
+            HeightUpdate();
         }
     }
 
@@ -157,49 +165,63 @@ public class GeckoController : MonoBehaviour
         );
     }
 
-    void FootHeightUpdate()
+    void HeightUpdate()
     {
+        // Store the average height of all four feet
         float avgHeight = 0;
         for (int i = 0; i < feet.Length; i++)
         {
             avgHeight += feet[i].homeTransform.transform.position.y;
         }
 
-        avgHeight = avgHeight / 4;
-        if (Math.Abs(transform.position.y - avgHeight - 0.5) > 0.01)
-        {
-            transform.position = new Vector3(transform.position.x, avgHeight - 0.5f,
-                transform.position.z);
-        }
+        avgHeight = avgHeight / feet.Length;
 
-        Vector3[] normals = new Vector3[4];
+        // Update the height of the gecko according to the height of its feet
+        transform.position = new Vector3(transform.position.x, avgHeight - 0.5f,
+            transform.position.z);
+
+        // Create storage for the normals of each of the gecko's feet
+        Vector3[] normals = new Vector3[feet.Length];
+
+        // Now that we've updated the model's height, we want to update the height and rotation of the feet
         for (int i = 0; i < feet.Length; i++)
         {
-            var footHome = feet[i].homeTransform;
-            var hitInfo1 = new RaycastHit();
-            if (Physics.Raycast(footHome.transform.position + footHome.up * 1f, -footHome.up, out hitInfo1))
-            {
-                footHome.position = hitInfo1.point + footHome.up * 0.15f;
-                if (Math.Abs(hitInfo1.normal.normalized.x - footHome.up.normalized.x) > 0.2 ||
-                    Math.Abs(hitInfo1.normal.normalized.z - footHome.up.normalized.z) > 0.2)
-                {
-                    footHome.rotation = Quaternion.LookRotation(footHome.forward, hitInfo1.normal);
-                    footHome.rotation = Quaternion.LookRotation(footHome.right, hitInfo1.normal);
-                    footHome.transform.Rotate(0, -footHome.localRotation.eulerAngles.y, 0);
-                }
+            // Here we want to update the home transforms of the feet, not the targets;
+            // the resulting home transform will change the angle and height of the target on the next step
+            Transform footHome = feet[i].homeTransform;
+            RaycastHit hitInfo = new RaycastHit();
 
-                normals[i] = (hitInfo1.normal);
+            // Generate a raycast from above the current home position and update the position on a hit
+            if (Physics.Raycast(footHome.transform.position + footHome.up * 1f, -footHome.up, out hitInfo))
+            {
+                // Relocate the home position for the foot just above the hit point
+                // (only so the hand mesh isn't partially sunken into the floor)
+                footHome.position = hitInfo.point + footHome.up * 0.15f;
+
+                // Adjust the rotation of the new position so the home's normal matches the hit's normal
+                footHome.rotation = Quaternion.LookRotation(footHome.forward, hitInfo.normal);
+                footHome.rotation = Quaternion.LookRotation(footHome.right, hitInfo.normal);
+
+                // Once the x/z rotations are correct, cancel the resulting y rotation (otherwise feet will be twisted!)
+                footHome.transform.Rotate(0, -footHome.localRotation.eulerAngles.y, 0);
+
+                // Store the normal of the current foot
+                normals[i] = (hitInfo.normal);
+
+                //Draw a ray in the scene view to show the normal of the foot
                 Debug.DrawRay(footHome.position, footHome.up * 100, Color.blue);
-                Debug.DrawRay(hitInfo1.point, hitInfo1.normal * 100, Color.red);
             }
         }
 
+        // Record the average of all of the normals of the feet
         Vector3 bodyNormal = Vector3.zero;
         for (int i = 0; i < normals.Length; i++)
         {
             bodyNormal += normals[i];
         }
 
+        // Figure out what rotations are needed to align the body with the combined feet normals,
+        // then apply a smoothing function to prevent the body from 'snapping' into the new rotation
         float yRot = transform.eulerAngles.y;
         Quaternion tempRotation = transform.rotation;
         transform.rotation = Quaternion.LookRotation(transform.forward, bodyNormal);
@@ -243,10 +265,10 @@ public class GeckoController : MonoBehaviour
             targetAngularVelocity,
             1 - Mathf.Exp(-turnAcceleration * Time.deltaTime)
         );
-        Debug.Log(currentAngularVelocity);
-        // Rotate the transform around the Y axis in world space, 
-        // making sure to multiply by delta time to get a consistent angular velocity
 
+        // Rotate the transform around the extra Y transform
+        // (if we attempt to rotate in world space, the model will get jammed on any non-flat surface), 
+        // making sure to multiply by delta time to get a consistent angular velocity
         yRotationTransform.transform.Rotate(0, Time.deltaTime * currentAngularVelocity, 0);
         Vector3 targetVelocity = Vector3.zero;
 
