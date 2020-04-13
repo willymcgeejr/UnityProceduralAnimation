@@ -6,7 +6,6 @@ public class GeckoController : MonoBehaviour
 {
     [SerializeField] Transform target;
     [SerializeField] Transform headBone;
-    [SerializeField] Transform tail;
     [SerializeField] float headMaxTurnAngle = 65.0f;
     [SerializeField] float headTrackingSpeed = 1.0f;
 
@@ -18,7 +17,7 @@ public class GeckoController : MonoBehaviour
     [SerializeField] float leftEyeMinYRotation = 0;
     [SerializeField] float rightEyeMaxYRotation = 30.0f;
     [SerializeField] float rightEyeMinYRotation = 0;
-    
+
     // The LegStepper objects for each foot
     [SerializeField] LegStepper frontLeftLegStepper;
     [SerializeField] LegStepper frontRightLegStepper;
@@ -34,8 +33,8 @@ public class GeckoController : MonoBehaviour
     [SerializeField] float moveAcceleration = 0.5f;
 
     // Try to stay in this range from the target
-    [SerializeField] float minDistToTarget = 1.0f;
-    [SerializeField] float maxDistToTarget = 4.0f;
+    [SerializeField] float minDistToTarget = 2.0f;
+    [SerializeField] float maxDistToTarget = 4.5f;
 
     // If we are above this angle from the target, start turning
     [SerializeField] float maxAngToTarget = 5.0f;
@@ -45,11 +44,6 @@ public class GeckoController : MonoBehaviour
 
     // Speed at which the gecko body adjusts to meet the normal of the ground
     [SerializeField] float smoothingSpeed = 20.0f;
-
-    // An additional transform to ensure rotation around the Y-axis is consistent with
-    // the rotation of the body
-    [SerializeField] Transform yRotationTransform;
-
 
     // World space velocity
     Vector3 currentVelocity;
@@ -94,8 +88,7 @@ public class GeckoController : MonoBehaviour
             Vector3.forward,
             targetLocalLookDir,
             Mathf.Deg2Rad * headMaxTurnAngle, // Note we multiply by Mathf.Deg2Rad here to convert degrees to radians
-            0 // We don't care about the length here, so we leave it at zero
-        );
+            0); // We don't care about the length here, so we leave it at zero
 
         // Get the local rotation by using LookRotation on a local directional vector
         Quaternion targetLocalRotation = Quaternion.LookRotation(targetLocalLookDir, Vector3.up);
@@ -177,8 +170,7 @@ public class GeckoController : MonoBehaviour
         avgHeight = avgHeight / feet.Length;
 
         // Update the height of the gecko according to the height of its feet
-        transform.position = new Vector3(transform.position.x, avgHeight - 0.5f,
-            transform.position.z);
+        transform.position = new Vector3(transform.position.x, avgHeight - 0.5f, transform.position.z);
 
         // Create storage for the normals of each of the gecko's feet
         Vector3[] normals = new Vector3[feet.Length];
@@ -239,8 +231,7 @@ public class GeckoController : MonoBehaviour
         Vector3 towardTargetProjected = Vector3.ProjectOnPlane(towardTarget, Vector3.up);
         // Get the angle from the gecko's forward direction to the direction toward toward our target
         // Here we get the signed angle around the up vector so we know which direction to turn in
-        float angToTarget =
-            Vector3.SignedAngle(yRotationTransform.transform.forward, towardTargetProjected, Vector3.up);
+        float angToTarget = Vector3.SignedAngle(transform.forward, towardTargetProjected, Vector3.up);
         float targetAngularVelocity = 0;
 
         // If we are within the max angle (i.e. approximately facing the target)
@@ -269,7 +260,7 @@ public class GeckoController : MonoBehaviour
         // Rotate the transform around the extra Y transform
         // (if we attempt to rotate in world space, the model will get jammed on any non-flat surface), 
         // making sure to multiply by delta time to get a consistent angular velocity
-        yRotationTransform.transform.Rotate(0, Time.deltaTime * currentAngularVelocity, 0);
+        transform.Rotate(0, Time.deltaTime * currentAngularVelocity, 0);
         Vector3 targetVelocity = Vector3.zero;
 
         // Don't move if we're facing away from the target, just rotate in place
