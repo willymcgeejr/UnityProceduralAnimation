@@ -6,7 +6,7 @@ This is an extension of a research assignment I did for my graphics and animatio
 
 The tutorial was very informative and well written, but I wanted to know if this style of animation could be adapted to fit to the geometry underneath rather than just a static plane. It wasn't necessary for the assignment, but after I presented the first version of the demo, I wanted to give it a shot.
 
-![Original animations with no geometry checking](https://i.gyazo.com/30d0e5a4647c782cfd809138210255e3.gif)
+![Original animations with no geometry checking](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/30d0e5a4647c782cfd809138210255e3.gif)
 
 As you can see above, our makeshift gecko does a great job of smoothly following the fly, but it just hovers at a static y-coordinate in worldspace. We can change that!
 
@@ -17,11 +17,11 @@ The first thing I wanted to do was make sure the gecko's feet knew where they ne
 
 By making a raycast downward from some position above the current 'home' position of the foot, we can use the point at which the raycast hits as a basis for where the new home should be. We can also use the normal of the same raycast to inform the rotation of the feet so they stay flat to the ground.
 
-![Something about this doesn't look right!](https://i.gyazo.com/003784803f43450edf215b3912e9a5d0.gif)
+![Something about this doesn't look right!](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/003784803f43450edf215b3912e9a5d0.gif)
 
 It works! But simply aligning the feet to the normal isn't good enough. If you look closely at the above GIF, the rotation of the feet is not being taken into account. Thankfully, because the feet are children of the overall gecko model we can just make sure that the local y-rotation of the foot is zeroed out after each adjustment to the normal.
 
-![Image from Gyazo](https://i.gyazo.com/7288c861ec199add8aa589de5ab3258a.gif)
+![Better!](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/7288c861ec199add8aa589de5ab3258a.gif)
 
 Much better!
 
@@ -30,13 +30,13 @@ Positioning the Body
 --
 The next problem we have to solve is the orientation of the rest of the gecko body. While the feet are adapting nicely to the ground below them, the body isn't following suit.
 
-![Not quite what we're looking for](https://i.gyazo.com/e06cc4b86726afdb93f3fb63176a19a8.gif)
+![Not quite what we're looking for](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/e06cc4b86726afdb93f3fb63176a19a8.gif)
 
 There are a few ways we could fix this. Since we're already doing the calculations, I opted to just take the average of the normals from each foot to give me a new normal that we want to try and fit the body's "up" vector to.
 
 The problem with doing this directly is you get a very choppy adjustment each time the normal of any of the feet change, as shown below.
 
-![Image from Gyazo](https://i.gyazo.com/2f8ed3c9a8e95a5d671930153acc4d68.gif)
+![Uh oh!](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/2f8ed3c9a8e95a5d671930153acc4d68.gif)
 
 To fix this, we can determine what rotation needs to be applied to fit the body to the average normal and then apply some smoothing between where the body is now and where we want it to be as seen in this block of code in GeckoController.cs:
 
@@ -50,11 +50,11 @@ To fix this, we can determine what rotation needs to be applied to fit the body 
 >        transform.rotation =
 >            Quaternion.RotateTowards(tempRotation, transform.rotation, smoothingSpeed * Time.deltaTime);
 
-![Image from Gyazo](https://i.gyazo.com/860dad4389fab0b37dcad29ee51aea5e.gif)
+![Image from Gyazo](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/860dad4389fab0b37dcad29ee51aea5e.gif)
 
 This looks much more natural! Now things are working more like we were hoping they would from the start. It works nicely on flat inclines and curved surfaces (so long as the gecko doesn't fall off the edge)!
 
-[![Image from Gyazo](https://i.gyazo.com/4539bfd6a6916b2bd8a77a936f7bcdd8.gif)](https://gyazo.com/4539bfd6a6916b2bd8a77a936f7bcdd8)
+![Image from Gyazo](https://github.com/willymcgeejr/UnityProceduralAnimation/blob/master/CMPT485ProceduralAnim/Assets/GIFs/4539bfd6a6916b2bd8a77a936f7bcdd8.gif)
 
 About the Included Code
 --
